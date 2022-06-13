@@ -1,0 +1,24 @@
+Replace Components
+
+    *: replace all instances of 160k replaced with 150k
+      > 150k resistor is cheaper
+
+    R#25: replace from 8k2 to 100k
+      > reduce voltage divider because passband attenuation was not accounted for
+
+    RX13: replace from 1k to 100R
+      > convenience
+
+    RX14: replace from 1k to 100R
+      > convenience
+
+    R#22: replace from 1k to 220R
+      > lower impedance to ADC
+
+Additions
+
+    Flip IC2A to the top layer (pin compatible)
+      > Save space on bottom standoff to be within height limitation
+
+    Add 10uF (106) capacitor on JX1 to GND
+      > Input signal noise is coupled as opamps draw current from Vbias supply
