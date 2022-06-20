@@ -24,6 +24,9 @@ class Acoustics:
         return centimeters_list
 
     def __init__(self, hx, hy, hz):
+        self.hx = hx
+        self.hy = hy
+        self.hz = hz
         self.hydrophone_positions = self.hydrophone_positions_array(hx, hy, hz)
 
     def update(self, raw_timing_list):
@@ -76,18 +79,25 @@ class Acoustics:
         quadrant = 'unknown'
         # 1A : RXY
         # 1B : RYX
-        # 2A : YRX, where R < 0.5(X+Y)
-        # 2B : YRX, where R > 0.5(X+Y)
+        # 2A : YRX, where R < 0.5(X+Y) @
+        # 2B : YRX, where R > 0.5(X+Y) @
         # 3A : YXR
         # 3B : XYR
-        # 4A : XRY, where R > 0.5(X+Y)
-        # 4B : XRY, where R < 0.5(X+Y)
+        # 4A : XRY, where R > 0.5(X+Y) @
+        # 4B : XRY, where R < 0.5(X+Y) @
+
+        # @ Actually midpoint is not exactly middle at 0.5 since hx != hy
+        # Let m be the midpoint ratio
+        #    sin 45deg = m*d/hy = (1-m)*d/hx
+        #    m*(1+hx/hy) = 1
+        midpoint_ratio = 1 / (1 + self.hx / self.hy)
+
         if trigger_sorted_index == (0, 1, 2):
             quadrant = '1A'
         elif trigger_sorted_index == (0, 2, 1):
             quadrant = '1B'
         elif trigger_sorted_index == (2, 0, 1):
-            if delta_tdoa_distances[0] < 0.5*(delta_tdoa_distances[1] + delta_tdoa_distances[2]):
+            if delta_tdoa_distances[0] < midpoint_ratio*(delta_tdoa_distances[1] + delta_tdoa_distances[2]):
                 quadrant = '2A'
             else:
                 quadrant = '2B'
@@ -96,7 +106,7 @@ class Acoustics:
         elif trigger_sorted_index == (1, 2, 0):
             quadrant = '3B'
         elif trigger_sorted_index == (1, 0, 2):
-            if delta_tdoa_distances[0] > 0.5*(delta_tdoa_distances[1] + delta_tdoa_distances[2]):
+            if delta_tdoa_distances[0] > midpoint_ratio*(delta_tdoa_distances[1] + delta_tdoa_distances[2]):
                 quadrant = '4A'
             else:
                 quadrant = '4B'
