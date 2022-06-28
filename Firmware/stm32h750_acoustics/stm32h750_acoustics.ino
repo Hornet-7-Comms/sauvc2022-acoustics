@@ -517,6 +517,7 @@ void setup() {
 
     //-- Start main process
 #define TIME_NOMINAL_PING (1000) // Pings come every 1 second
+#define TIME_PING_DURATION (10) // Each ping lasts for 10ms duration
 #define TIME_CALIBRATION (1100) // 1.1 seconds is confirmed to contain a ping
 #define TIME_WAIT_FOLLOWING_PEAK (960) // Start sampling into buffer just before the next peak
 
@@ -656,15 +657,47 @@ void setup() {
       
       // Set algorithm parameters
       const int movingAveragePeriod = 50;
-      const float threshold = 98 * 1e6; // HERE!!
+      const float differential_threshold = 100 * 1e6; // HERE!!
+      const float amplitude_threshold = 13500 * 1e6;
       float previous_magnitude[4] = {0,0,0,0};
       int ticks[4] = {0,0,0,0};
 
       float exceededThreshold = upperLimit * 0.5;
       bool exceededQuit = false;
 
+      // Based on absolute amplitude threshold, find approximate times where signal is present
+      bool isValidSignal = false;
+      const int min_start_tick = movingAveragePeriod; // first valid sample in goertzel
+      const int max_end_tick = (Hydrophone_Index-GOERTZEL_SAMPLE_SIZE*2); // last valid sample in goertzel
+ 
+      int approx_start_tick = 0;
+      int approx_end_tick = max_end_tick;
+      for (int i = movingAveragePeriod; i < (Hydrophone_Index-GOERTZEL_SAMPLE_SIZE*2); i++) {
+        Goertzel_MovingAverage(i, movingAveragePeriod);
+        for (int x = 0; x < 4; x++) {
+          // If there is a rising signal from below to above absolute amplitude,
+          // then there is a valid signal
+          if (Goertzel_magnitude[x] >= amplitude_threshold) {
+            isValidSignal = true;
+            approx_start_tick = i;
+          }
+        }
+        if (approx_start_tick > 0) break;
+      }
+
+      // Start analysis from 1 ping duration before to slightly after
+      // If it results in a negative number (before the movingAveragePeriod),
+      // then it is an invalid start position (false positive)
+      if (approx_start_tick > 0) {
+        const int one_ping = (int) (TIME_PING_DURATION/1000.0*SAMPLING_FREQUENCY);
+        approx_start_tick -= one_ping;
+        // Constraint to boundaries
+        approx_start_tick = max(min_start_tick, approx_start_tick);
+        approx_end_tick = max_end_tick; // TODO: min(max_end_tick, approx_start_tick + one_ping*2);
+      }
+
       // Loop moving average
-      for (int i = movingAveragePeriod; i < (ADC_BUFFER_SIZE-GOERTZEL_SAMPLE_SIZE); i++) {
+      for (int i = approx_start_tick; i < approx_end_tick; i++) {
         // Save previous magnitude
         for (int x = 0; x < 4; x++) {
           previous_magnitude[x] = Goertzel_magnitude[x];
@@ -677,7 +710,8 @@ void setup() {
         if (i > (movingAveragePeriod+2)) {
           // compare differential
           for (int y = 0; y < 4; y++) {
-            if ( (Goertzel_magnitude[y] - previous_magnitude[y])*normalisation[y] > threshold) {
+            // If gradient exceeds, then we found the start of the ping
+            if ( (Goertzel_magnitude[y] - previous_magnitude[y])*normalisation[y] > differential_threshold) {
               if (ticks[y] == 0) ticks[y] = i;
             }
           }
@@ -704,6 +738,14 @@ void setup() {
         }
         if (exceededQuit) break;
       }
+
+      // Set to max value to indicate error
+      if (!isValidSignal) {
+        ticks[0] = ADC_BUFFER_SIZE-1;
+        ticks[1] = ADC_BUFFER_SIZE-1;
+        ticks[2] = ADC_BUFFER_SIZE-1;
+        ticks[3] = ADC_BUFFER_SIZE-1;
+      }
       LED_GREEN_Off();
 
 
@@ -724,10 +766,12 @@ void setup() {
         Serial.print("Target frequency /1e3: "); Serial.println(targetFrequency/1e3, DEC);
         Serial.print("Upper limit /1e9: "); Serial.println(upperLimit/1e9, DEC);
         //Serial.print("Lowest limit: "); Serial.println(lowerLimit, DEC);
-        Serial.print("Threshold /1e6: "); Serial.println(threshold/1e6, DEC);
+        Serial.print("Differential Threshold /1e6: "); Serial.println(differential_threshold/1e6, DEC);
   
         Serial.println("Hydrophone_Index : "); Serial.println(Hydrophone_Index, DEC);
   
+        Serial.print("approx_start_tick: "); Serial.println(approx_start_tick, DEC);
+        Serial.print("approx_end_tick: "); Serial.println(approx_end_tick, DEC);
         Serial.print("exceededQuit: "); Serial.println(exceededQuit, DEC);
           
         // ticks data
