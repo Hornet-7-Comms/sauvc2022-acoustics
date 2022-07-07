@@ -839,11 +839,12 @@ void setup() {
         //Serial.send_now(); // trigger send now
       }
 
-      // Change frequency if needed
-      delay(10);
-      // TODO: logic to change frequency
-      //targetFrequency = (HYDROPHONE_FREQ_FLARE); // 37.5kHz
-      targetFrequency = (HYDROPHONE_FREQ_DRUM); // 45kHz
+      // Alternate frequency every time
+      if (targetFrequency == HYDROPHONE_FREQ_FLARE) {
+        targetFrequency = (HYDROPHONE_FREQ_DRUM); // 45kHz
+      } else {
+        targetFrequency = (HYDROPHONE_FREQ_FLARE); // 37.5kHz
+      }
 
       LED_WHITE_Off();
       LED_GREEN_Off();
